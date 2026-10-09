@@ -161,3 +161,192 @@ class TransportSystem:
                     }
                 )
         return sorted(results, key=lambda x: x["duration_min"])
+
+    def find_transfer_routes(
+        self,
+        start: Stop,
+        end: Stop,
+        min_transfer: int = 5,
+        is_weekend: bool = False,
+    ) -> List[dict]:
+        results = []
+        active_trips = [t for t in self.trips if t.is_weekend == is_weekend]
+
+        for trip1 in active_trips:
+            dep_1 = trip1.arrival_at_stop(start)
+            if dep_1 is None:
+                continue
+
+            start_idx = trip1.route.get_stop_index(start)
+            next_stops = trip1.route.stops[start_idx + 1 :]
+
+            for transfer_stop in next_stops:
+                arr_1 = trip1.arrival_at_stop(transfer_stop)
+
+                for trip2 in active_trips:
+                    if trip1 == trip2:
+                        continue
+
+                    dep_2 = trip2.arrival_at_stop(transfer_stop)
+                    arr_2 = trip2.arrival_at_stop(end)
+
+                    if (
+                        dep_2 is not None
+                        and arr_2 is not None
+                        and dep_2 < arr_2
+                    ):
+                        wait = dep_2 - arr_1
+                        if wait >= min_transfer:
+                            results.append(
+                                {
+                                    "trip1_route": trip1.route.number,
+                                    "trip1_dep": time_to_str(dep_1),
+                                    "transfer_stop": transfer_stop.name,
+                                    "wait_min": wait,
+                                    "trip2_route": trip2.route.number,
+                                    "trip2_dep": time_to_str(dep_2),
+                                    "final_arr": time_to_str(arr_2),
+                                    "total_duration_min": arr_2 - dep_1,
+                                }
+                            )
+
+        return sorted(results, key=lambda x: x["total_duration_min"])
+
+
+def load_from_json(filename: str = "data.json") -> TransportSystem:
+    system = TransportSystem()
+    with open(filename, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    for s_name in data["stops"]:
+        system.add_stop(s_name)
+
+    for r_data in data["routes"]:
+        t_type = TransportType[r_data["transport_type"]]
+        r_stops = [system.stops[name] for name in r_data["stops"]]
+        route = Route(
+            r_data["number"], t_type, r_stops, r_data["travel_times"]
+        )
+        system.add_route(route)
+
+    for t_data in data["trips"]:
+        route = system.routes[t_data["route_number"]]
+        trip = Trip(
+            route, t_data["departure"], t_data.get("is_weekend", False)
+        )
+        system.add_trip(trip)
+
+    return system
+
+
+def input_from_keyboard() -> TransportSystem:
+    system = TransportSystem()
+    print("\n--- Ручной ввод данных сети ---")
+    n_stops = int(input("Количество остановок в сети: "))
+    for i in range(n_stops):
+        name = input(f"  Название остановки #{i + 1}: ").strip()
+        system.add_stop(name)
+
+    n_routes = int(input("\nКоличество маршрутов: "))
+    for i in range(n_routes):
+        print(f"\n--- Маршрут #{i + 1} ---")
+        num = input("Номер маршрута: ").strip()
+        type_str = input("Тип (BUS / TROLLEYBUS / BUS2): ").strip().upper()
+        t_type = TransportType[type_str]
+
+        stops_count = int(input("Количество остановок на этом маршруте: "))
+        route_stops = []
+        for s_i in range(stops_count):
+            s_name = input(f"  Остановка #{s_i + 1}: ").strip()
+            if s_name not in system.stops:
+                system.add_stop(s_name)
+            route_stops.append(system.stops[s_name])
+
+        times = []
+        for s_i in range(stops_count - 1):
+            t = int(input(f"  Время хода между '{route_stops[s_i]}' и '{route_stops[s_i+1]}' (мин): "))
+            times.append(t)
+
+        route = Route(num, t_type, route_stops, times)
+        system.add_route(route)
+
+    n_trips = int(input("\nКоличество рейсов: "))
+    for i in range(n_trips):
+        print(f"--- Рейс #{i + 1} ---")
+        r_num = input("Маршрут для рейса: ").strip()
+        dep = input("Время отправления (ЧЧ:ММ): ").strip()
+        is_wk = input("Рейс выходного дня? (y/n): ").strip().lower() == "y"
+        system.add_trip(Trip(system.routes[r_num], dep, is_weekend=is_wk))
+
+    return system
+
+
+def main():
+    print("=" * 60)
+    print(" МОДЕЛЬ МАРШРУТОВ ГОРОДСКОГО ТРАНСПОРТА (ВОРОНЕЖ)")
+    print("=" * 60)
+
+    print("Выберите способ загрузки данных:")
+    print("1. Загрузить из файла data.json")
+    print("2. Ввести данные вручную с клавиатуры")
+    choice = input("Ваш выбор (1 или 2, по умолчанию 1): ").strip()
+
+    if choice == "2":
+        system = input_from_keyboard()
+    else:
+        system = load_from_json("data.json")
+        print("Данные успешно загружены из data.json!")
+
+    while True:
+        print("\n" + "=" * 45)
+        print("ОСНОВНОЕ МЕНЮ:")
+        print("1. Расписание по остановке")
+        print("2. Расчёт прибытия на k-ю остановку")
+        print("3. Расчёт интервалов движения")
+        print("4. Поиск поездки (прямой путь или с 1 пересадкой)")
+        print("0. Выход")
+        cmd = input("Выберите действие: ").strip()
+
+        if cmd == "0":
+            print("Работа программы завершена.")
+            break
+        elif cmd == "1":
+            print("Остановки:", list(system.stops.keys()))
+            name = input("Название остановки: ").strip()
+            if name in system.stops:
+                is_wk = input("Выходной день? (y/n): ").strip().lower() == "y"
+                for arr_t, r_num, t_type in system.get_schedule_for_stop(system.stops[name], is_wk):
+                    print(f"  {arr_t} | {r_num} ({t_type})")
+        elif cmd == "2":
+            print("Маршруты:", list(system.routes.keys()))
+            r_num = input("Номер маршрута: ").strip()
+            if r_num in system.routes:
+                r = system.routes[r_num]
+                k = int(input(f"Номер остановки k (1..{len(r.stops)}): "))
+                dep = input("Отправление (ЧЧ:ММ): ").strip()
+                print(f"Прибытие: {time_to_str(Trip(r, dep).arrival_at_kth_stop(k))}")
+        elif cmd == "3":
+            print("Маршруты:", list(system.routes.keys()))
+            r_num = input("Номер маршрута: ").strip()
+            if r_num in system.routes:
+                is_wk = input("Выходной день? (y/n): ").strip().lower() == "y"
+                print(f"Интервалы (в мин): {system.calculate_headway(system.routes[r_num], is_wk)}")
+        elif cmd == "4":
+            print("Остановки:", list(system.stops.keys()))
+            s_from = input("Откуда: ").strip()
+            s_to = input("Куда: ").strip()
+            if s_from in system.stops and s_to in system.stops:
+                is_wk = input("Выходной день? (y/n): ").strip().lower() == "y"
+                direct = system.find_direct_routes(system.stops[s_from], system.stops[s_to], is_wk)
+                if direct:
+                    print("[Прямой рейс]:", direct[0])
+                else:
+                    transfers = system.find_transfer_routes(system.stops[s_from], system.stops[s_to], 5, is_wk)
+                    if transfers:
+                        print("[С пересадкой]:", transfers[0])
+                    else:
+                        print("Маршрутов не найдено.")
+
+
+if __name__ == "__main__":
+    main()

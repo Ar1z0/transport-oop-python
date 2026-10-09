@@ -1,0 +1,77 @@
+{
+  "stops": [
+    "Вокзал Воронеж-1",
+    "ЮВЖД",
+    "Проспект Революции",
+    "Площадь Ленина",
+    "ВГУ",
+    "Застава",
+    "Памятник Славы"
+  ],
+  "routes": [
+    {
+      "number": "Автобус 9КА",
+      "transport_type": "BUS",
+      "stops": [
+        "Вокзал Воронеж-1",
+        "ЮВЖД",
+        "Проспект Революции",
+        "Площадь Ленина",
+        "ВГУ"
+      ],
+      "travel_times": [6, 5, 4, 5]
+    },
+    {
+      "number": "Троллейбус 7",
+      "transport_type": "TROLLEYBUS",
+      "stops": [
+        "Площадь Ленина",
+        "Застава",
+        "Памятник Славы"
+      ],
+      "travel_times": [8, 12]
+    }
+  ],
+  "trips": [
+    {
+      "route_number": "Автобус 9КА",
+      "departure": "08:00",
+      "is_weekend": false
+    },
+    {
+      "route_number": "Автобус 9КА",
+      "departure": "08:15",
+      "is_weekend": false
+    },
+    {
+      "route_number": "Автобус 9КА",
+      "departure": "08:35",
+      "is_weekend": false
+    },
+    {
+      "route_number": "Автобус 9КА",
+      "departure": "09:00",
+      "is_weekend": true
+    },
+    {
+      "route_number": "Автобус 9КА",
+      "departure": "09:30",
+      "is_weekend": true
+    },
+    {
+      "route_number": "Троллейбус 7",
+      "departure": "08:20",
+      "is_weekend": false
+    },
+    {
+      "route_number": "Троллейбус 7",
+      "departure": "08:40",
+      "is_weekend": false
+    },
+    {
+      "route_number": "Троллейбус 7",
+      "departure": "09:15",
+      "is_weekend": true
+    }
+  ]
+}
