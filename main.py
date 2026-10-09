@@ -86,3 +86,78 @@ class Trip:
         if idx is not None:
             return self.arrival_at_kth_stop(idx + 1)
         return None
+
+
+class TransportSystem:
+    def __init__(self):
+        self.stops: Dict[str, Stop] = {}
+        self.routes: Dict[str, Route] = {}
+        self.trips: List[Trip] = []
+
+    def add_stop(self, name: str) -> Stop:
+        if name not in self.stops:
+            self.stops[name] = Stop(name)
+        return self.stops[name]
+
+    def add_route(self, route: Route):
+        self.routes[route.number] = route
+
+    def add_trip(self, trip: Trip):
+        self.trips.append(trip)
+
+    def get_schedule_for_stop(
+        self, stop: Stop, is_weekend: bool = False
+    ) -> List[Tuple[str, str, str]]:
+        schedule = []
+        for trip in self.trips:
+            if trip.is_weekend == is_weekend:
+                arr = trip.arrival_at_stop(stop)
+                if arr is not None:
+                    schedule.append(
+                        (
+                            time_to_str(arr),
+                            trip.route.number,
+                            trip.route.transport_type.title,
+                        )
+                    )
+        return sorted(schedule, key=lambda x: x[0])
+
+    def calculate_headway(
+        self, route: Route, is_weekend: bool = False
+    ) -> List[int]:
+        route_trips = [
+            t
+            for t in self.trips
+            if t.route == route and t.is_weekend == is_weekend
+        ]
+        route_trips.sort(key=lambda t: t.dep_min)
+
+        intervals = []
+        for i in range(1, len(route_trips)):
+            intervals.append(
+                route_trips[i].dep_min - route_trips[i - 1].dep_min
+            )
+        return intervals
+
+    def find_direct_routes(
+        self, start: Stop, end: Stop, is_weekend: bool = False
+    ) -> List[dict]:
+        results = []
+        for trip in self.trips:
+            if trip.is_weekend != is_weekend:
+                continue
+
+            dep = trip.arrival_at_stop(start)
+            arr = trip.arrival_at_stop(end)
+
+            if dep is not None and arr is not None and dep < arr:
+                results.append(
+                    {
+                        "route": trip.route.number,
+                        "type": trip.route.transport_type.title,
+                        "departure": time_to_str(dep),
+                        "arrival": time_to_str(arr),
+                        "duration_min": arr - dep,
+                    }
+                )
+        return sorted(results, key=lambda x: x["duration_min"])
